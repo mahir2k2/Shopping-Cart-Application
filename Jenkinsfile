@@ -3,16 +3,10 @@ pipeline {
 
     environment {
         DOCKER_IMAGE = "mahirs1205/aimdekassignment"
-        IMAGE_TAG = "latest"
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
     }
 
     stages {
-
-        stage('Checkout Code') {
-            steps {
-                git 'https://github.com/mehediislamripon/Shopping-Cart-Application.git'
-            }
-        }
 
         stage('Build Docker Image') {
             steps {
@@ -31,7 +25,9 @@ pipeline {
                 )]) {
                     sh """
                         echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                        docker tag $DOCKER_IMAGE:$IMAGE_TAG $DOCKER_IMAGE:latest
                         docker push $DOCKER_IMAGE:$IMAGE_TAG
+                        docker push $DOCKER_IMAGE:latest
                     """
                 }
             }
@@ -39,7 +35,7 @@ pipeline {
 
         stage('Deploy to EC2') {
             steps {
-                sshagent(['jenkins-agent-key']) {
+                sshagent(['deploy-ssh-key']) {
                     sh """
                         ssh -o StrictHostKeyChecking=no ubuntu@10.0.1.125 '
                             docker pull $DOCKER_IMAGE:$IMAGE_TAG &&
