@@ -4,7 +4,8 @@ pipeline {
     environment {
         DOCKER_IMAGE = "mahirs1205/aimdekassignment"
         IMAGE_TAG = "${BUILD_NUMBER}"
-        APP_SERVER = "10.0.1.125"
+        AWS_REGION = "ap-south-1"
+        INSTANCE_ID = "i-0e8bd4b5e9e8ca9d1"
     }
 
     stages {
@@ -42,20 +43,21 @@ pipeline {
             }
         }
 
-        stage('Deploy to EC2') {
+        stage('Deploy to EC2 via SSM') {
             steps {
-                sshagent(['deploy-ssh-key']) {
-                    sh """
-                        ssh -o StrictHostKeyChecking=no ubuntu@${APP_SERVER} '
-                            docker pull ${DOCKER_IMAGE}:${IMAGE_TAG} &&
-                            docker stop shopping-app || true &&
-                            docker rm shopping-app || true &&
-                            docker run -d -p 3000:3000 \
-                              --name shopping-app \
-                              ${DOCKER_IMAGE}:${IMAGE_TAG}
-                        '
-                    """
-                }
+                sh """
+                    aws ssm send-command \
+                      --instance-ids ${INSTANCE_ID} \
+                      --document-name "AWS-RunShellScript" \
+                      --comment "Deploying Docker container via Jenkins" \
+                      --parameters commands="
+                        docker pull ${DOCKER_IMAGE}:${IMAGE_TAG};
+                        docker stop shopping-app || true;
+                        docker rm shopping-app || true;
+                        docker run -d -p 3000:3000 --name shopping-app ${DOCKER_IMAGE}:${IMAGE_TAG};
+                      " \
+                      --region ${AWS_REGION}
+                """
             }
         }
     }
